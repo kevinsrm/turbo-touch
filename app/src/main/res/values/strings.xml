@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">TurboTouch</string>
+    <string name="notification_channel_name">Monitor de perfil de hardware</string>
+    <string name="notification_channel_description">Notificacao persistente do monitor de app em primeiro plano</string>
+    <string name="notification_title">TurboTouch ativo</string>
+    <string name="notification_text">Aplicando perfil de hardware por aplicativo</string>
+</resources>
