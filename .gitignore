@@ -1,0 +1,18 @@
+# Gradle
+.gradle/
+build/
+*/build/
+local.properties
+gradle-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+.DS_Store
+
+# Keystores
+*.jks
+*.keystore
+
+# Local ad-network overrides (real zone ids / keys live here)
+ads_config.local.properties
