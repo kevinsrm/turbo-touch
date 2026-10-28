@@ -5,15 +5,17 @@
 | Item | Versao |
 | --- | --- |
 | JDK | 17 |
-| Gradle | 8.9 (o wrapper e regenerado pelo `gradlew` se faltar o jar) |
+| Gradle | 8.14.4 (configurado no wrapper) |
 | Android Gradle Plugin | 8.7.3 |
 | Kotlin | 2.4.20 |
-| compileSdk / targetSdk | 35 |
+| compileSdk / targetSdk | 36 / 35 |
 | minSdk | 29 (Android 10) |
 
 ## Dependências externas
 
-O cliente ADB Wireless usa `com.flyfishxu:kadb:2.1.5` do Maven Central e o SPAKE2 publicado no JitPack (repositório filtrado no `settings.gradle.kts`).
+O cliente ADB Wireless usa `com.flyfishxu:kadb:2.1.1` do Maven Central e o SPAKE2 publicado no JitPack (repositório filtrado no `settings.gradle.kts`). A versão 2.1.1 usa compileSdk 36; as versões 2.1.3 a 2.1.5 usam SDK 37.
+
+O Android Gradle Plugin 8.7.3 pode emitir um aviso por ter sido testado até o SDK 35. Esse aviso é separado da verificação de metadados das dependências e não impede, por si só, o build com SDK 36.
 
 ## Passo a passo
 
@@ -46,7 +48,7 @@ Abrindo o projeto no Android Studio, o IDE gera o wrapper sozinho.
 
 * nao assina nada: `assembleRelease` gera APK unsigned. Configure o `signingConfigs`
   do seu lado (ou use o `playApp` do Android Studio).
-* nao baixa Android SDK: a maquina precisa do SDK 35 instalado.
+* nao baixa Android SDK: a maquina precisa da plataforma Android SDK 36 instalada.
 
 ## Diagnostico
 
