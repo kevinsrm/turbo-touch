@@ -48,7 +48,23 @@ android {
     }
 
     packaging {
-        resources.excludes += setOf("/META-INF/{AL2.0,LGPL2.1}")
+        resources.excludes += setOf(
+            "/META-INF/{AL2.0,LGPL2.1}",
+            // bcpkix/bcutil/bcprov (via kadb) e jspecify sao jars multi-release:
+            // todos trazem os mesmos descritores em META-INF/versions/9, o que
+            // faz o :app:mergeDebugJavaResource falhar com "N files found with
+            // path 'META-INF/versions/9/OSGI-INF/MANIFEST.MF'". O Android nao
+            // le descritores OSGi nem module-info em runtime.
+            "META-INF/versions/*/OSGI-INF/MANIFEST.MF",
+            "META-INF/versions/**/MANIFEST.MF",
+            "META-INF/versions/*/module-info.class",
+            "META-INF/versions/**/module-info.class",
+            // Licencas/metadados repetidos entre os jars do BouncyCastle.
+            "META-INF/LICENSE*",
+            "META-INF/NOTICE*",
+            "META-INF/DEPENDENCIES",
+            "META-INF/INDEX.LIST",
+        )
     }
 }
 
