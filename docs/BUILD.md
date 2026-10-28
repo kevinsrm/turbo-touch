@@ -50,6 +50,39 @@ Abrindo o projeto no Android Studio, o IDE gera o wrapper sozinho.
   do seu lado (ou use o `playApp` do Android Studio).
 * nao baixa Android SDK: a maquina precisa da plataforma Android SDK 36 instalada.
 
+## Conflitos de packaging (META-INF)
+
+O `kadb` traz o BouncyCastle 1.83 (`bcpkix`, `bcutil`, `bcprov`) e o `jspecify`
+vem junto na resolucao. Esses jars sao *multi-release* e todos carregam os mesmos
+arquivos em `META-INF/versions/9`, o que quebrava o build em:
+
+```
+Execution failed for task ':app:mergeDebugJavaResource'.
+> 4 files found with path 'META-INF/versions/9/OSGI-INF/MANIFEST.MF'
+```
+
+O `app/build.gradle.kts` exclui esses metadados no bloco `packaging`:
+
+```kotlin
+packaging {
+    resources.excludes += setOf(
+        "/META-INF/{AL2.0,LGPL2.1}",
+        "META-INF/versions/*/OSGI-INF/MANIFEST.MF",
+        "META-INF/versions/**/MANIFEST.MF",
+        "META-INF/versions/*/module-info.class",
+        "META-INF/versions/**/module-info.class",
+        "META-INF/LICENSE*",
+        "META-INF/NOTICE*",
+        "META-INF/DEPENDENCIES",
+        "META-INF/INDEX.LIST",
+    )
+}
+```
+
+Nada disso e usado em runtime no Android: descritores OSGi e `module-info.class`
+sao lidos apenas pela JVM/OSGi, nao pela ART. Se um novo jar multi-release entrar
+no grafo, o mesmo bloco cobre o conflito.
+
 ## Diagnostico
 
 * O servico em primeiro plano nao sobe: Android 15 restringe inicio de FGS em
