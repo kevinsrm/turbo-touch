@@ -48,7 +48,7 @@ turbo-touch/
 
 ## Build
 
-Requisitos: JDK 17, Android Studio Hedgehog+ (ou Gradle 8.9 + Android SDK 35).
+Requisitos: JDK 17, Android Studio Hedgehog+ (ou Gradle 8.9 + Android SDK 35). O cliente ADB usa Kadb (Maven Central) e a dependência SPAKE2 do JitPack.
 
 ```bash
 # 1. apontar o SDK
@@ -71,7 +71,8 @@ wrapper com o Gradle local ou explica o que fazer. Detalhes em [docs/BUILD.md](d
 | --- | --- |
 | Root (`su`) | habilita o controle **por app** (game mode, force-idle, devfreq, modo de display) |
 | Sem root | refresh global via `WRITE_SETTINGS` + deteccao de primeiro plano via "acesso a dados de uso" |
-| Monitor | servico em primeiro plano (tipo `specialUse`), religado no boot |
+| ADB Wi-Fi | cliente ADB local, emparelhamento Android Wireless Debugging com código, conexão TLS por loopback e comandos com uid `shell` (não root) |
+| Monitor | serviço em primeiro plano (`specialUse`), religado no boot; HUD de FPS (best-effort), Hz, bateria e CPU/GPU quando disponíveis |
 
 Sem root o app ainda funciona, mas o refresh vale para o sistema inteiro e a
 economia agressiva por app fica indisponivel.
@@ -98,14 +99,18 @@ Matriz completa em [docs/PER_APP_PROFILES.md](docs/PER_APP_PROFILES.md).
 ## Configuração e limitações
 
 No primeiro uso, o assistente explica notificações, acesso ao uso, otimização de
-bateria e sobreposição; as permissões podem ser puladas. Em Ajustes escolha Root
-ou Sem root (padrão). A troca tenta reverter o perfil e os ajustes globais antes
-de passar ao novo modo, mas comandos de reversão podem falhar no dispositivo;
-verifique o histórico. O modo sem root nunca chama `su` para comandos privilegiados.
+bateria e sobreposição; as permissões podem ser puladas. Em Ajustes escolha Root,
+Sem root ou ADB Wi-Fi. Para ADB Wi-Fi, ative Depuração sem fio nas opções de
+desenvolvedor e use a ação **Parear por notificação**: envie o código temporário
+de seis dígitos e a porta de pareamento. Depois informe a porta de conexão
+(separada) mostrada na tela principal de Depuração sem fio. A conexão usa o
+cliente ADB TLS nativo em `127.0.0.1`; a identidade ADB fica em armazenamento
+privado excluído de backup. A sessão é uid `shell`, não root. O código do
+pareamento não é salvo após a tentativa. O modo sem root nunca chama `su`.
 
-O HUD depende da permissão de sobreposição e do serviço de monitoramento. Ele
-mostra Hz do display e nível, temperatura e corrente da bateria quando reportados
-pelo aparelho; corrente positiva ou negativa segue a convenção do dispositivo.
-FPS de outros apps e uso global de CPU/GPU não são fornecidos por este HUD.
-Depuração Wi-Fi/pareamento ADB e notificação interativa ainda não foram
-implementados. Nenhum privilégio ADB é simulado ou obtido via Shizuku.
+O HUD requer permissão de sobreposição e o serviço de monitoramento. CPU é
+estimada por diferenças de `/proc/stat`; GPU consulta interfaces sysfs comuns de
+fabricantes; ambas podem aparecer como `n/d` se o sistema não as expõe. FPS usa
+`dumpsys SurfaceFlinger --latency` quando há acesso via root ou ADB Wi-Fi e pode
+não estar disponível em todas as versões/fabricantes. Hz e nível, temperatura e
+corrente da bateria também são exibidos quando reportados pelo dispositivo.

@@ -19,12 +19,14 @@ class MonitorOverlay(private val context: Context, private val prefs: Prefs) {
     private val window = context.getSystemService(WindowManager::class.java)
     private var view: TextView? = null
 
-    fun update() {
-        if ((!prefs.hudRefresh && !prefs.hudBattery) || !Settings.canDrawOverlays(context)) {
+    fun update(metrics: MonitorMetrics.Snapshot) {
+        if ((!prefs.hudFps && !prefs.hudRefresh && !prefs.hudBattery && !prefs.hudCpuGpu) || !Settings.canDrawOverlays(context)) {
             close()
             return
         }
         val lines = mutableListOf<String>()
+        if (prefs.hudFps) lines += "FPS: ${metrics.fps}"
+        if (prefs.hudCpuGpu) lines += "CPU: ${metrics.cpu} · GPU: ${metrics.gpu}"
         if (prefs.hudRefresh) {
             val display = context.getSystemService(DisplayManager::class.java).getDisplay(Display.DEFAULT_DISPLAY)
             lines += display?.let { "Tela: %.1f Hz".format(it.refreshRate) } ?: "Tela: indisponível"

@@ -17,6 +17,10 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // Kadb's SPAKE2 primitive is published under this JitPack group.
+        maven("https://jitpack.io") {
+            content { includeGroup("com.github.Flyfish233") }
+        }
     }
 }
 

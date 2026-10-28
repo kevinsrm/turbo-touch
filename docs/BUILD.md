@@ -7,9 +7,13 @@
 | JDK | 17 |
 | Gradle | 8.9 (o wrapper e regenerado pelo `gradlew` se faltar o jar) |
 | Android Gradle Plugin | 8.7.3 |
-| Kotlin | 2.0.21 |
+| Kotlin | 2.4.20 |
 | compileSdk / targetSdk | 35 |
 | minSdk | 29 (Android 10) |
+
+## Dependências externas
+
+O cliente ADB Wireless usa `com.flyfishxu:kadb:2.1.5` do Maven Central e o SPAKE2 publicado no JitPack (repositório filtrado no `settings.gradle.kts`).
 
 ## Passo a passo
 

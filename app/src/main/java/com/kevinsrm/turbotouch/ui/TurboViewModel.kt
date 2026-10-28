@@ -39,8 +39,11 @@ data class TurboUiState(
     val installedApps: List<InstalledApp> = emptyList(),
     val log: List<CommandEntry> = emptyList(),
     val executionMode: ExecutionMode = ExecutionMode.STANDARD,
+    val hudFps: Boolean = false,
     val hudRefresh: Boolean = false,
     val hudBattery: Boolean = false,
+    val hudCpuGpu: Boolean = false,
+    val adbConnectionPort: Int = 0,
     val globalRefreshHz: Int = 0,
     val lockClocks: Boolean = false,
     val thermalOverride: Boolean = false,
@@ -85,8 +88,11 @@ class TurboViewModel(app: Application) : AndroidViewModel(app) {
             installedApps = apps,
             log = CommandLog.entries.value,
             executionMode = graph.prefs.executionMode,
+            hudFps = graph.prefs.hudFps,
             hudRefresh = graph.prefs.hudRefresh,
             hudBattery = graph.prefs.hudBattery,
+            hudCpuGpu = graph.prefs.hudCpuGpu,
+            adbConnectionPort = graph.prefs.adbConnectionPort,
             globalRefreshHz = graph.prefs.globalRefreshHz,
             lockClocks = graph.prefs.lockClocksGlobal,
             thermalOverride = graph.prefs.thermalOverride,
@@ -144,6 +150,22 @@ class TurboViewModel(app: Application) : AndroidViewModel(app) {
         graph.prefs.executionMode = mode
         if (!graph.prefs.serviceEnabled) graph.shell.mode = mode
         _state.value = _state.value.copy(executionMode = mode)
+    }
+
+    fun setHudFps(enabled: Boolean) {
+        graph.prefs.hudFps = enabled
+        _state.value = _state.value.copy(hudFps = enabled)
+    }
+
+    fun setHudCpuGpu(enabled: Boolean) {
+        graph.prefs.hudCpuGpu = enabled
+        _state.value = _state.value.copy(hudCpuGpu = enabled)
+    }
+
+    fun setAdbConnectionPort(port: Int) {
+        val safePort = port.takeIf { it in 1..65535 } ?: 0
+        graph.prefs.adbConnectionPort = safePort
+        _state.value = _state.value.copy(adbConnectionPort = safePort, message = "")
     }
 
     fun setHudRefresh(enabled: Boolean) {
