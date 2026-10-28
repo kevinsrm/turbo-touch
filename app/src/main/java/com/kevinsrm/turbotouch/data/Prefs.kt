@@ -1,6 +1,7 @@
 package com.kevinsrm.turbotouch.data
 
 import android.content.Context
+import com.kevinsrm.turbotouch.core.ExecutionMode
 
 /** Preferencias globais do app (fora dos perfis por aplicativo). */
 class Prefs(context: Context) {
@@ -24,23 +25,21 @@ class Prefs(context: Context) {
         get() = prefs.getInt(KEY_REFRESH, 0)
         set(value) = prefs.edit().putInt(KEY_REFRESH, value).apply()
 
-    /** null = usa o valor do arquivo de configuracao de anuncios. */
-    var adsEnabledOverride: Boolean?
-        get() = if (prefs.contains(KEY_ADS_ENABLED)) {
-            prefs.getBoolean(KEY_ADS_ENABLED, true)
-        } else {
-            null
-        }
-        set(value) {
-            val editor = prefs.edit()
-            if (value == null) editor.remove(KEY_ADS_ENABLED) else editor.putBoolean(KEY_ADS_ENABLED, value)
-            editor.apply()
-        }
+    var executionMode: ExecutionMode
+        get() = runCatching { ExecutionMode.valueOf(prefs.getString("execution_mode", "STANDARD") ?: "STANDARD") }
+            .getOrDefault(ExecutionMode.STANDARD)
+        set(value) = prefs.edit().putString("execution_mode", value.name).apply()
 
-    /** Libera o harness de teste de clique (QA) do modulo de anuncios. */
-    var qaClickTest: Boolean
-        get() = prefs.getBoolean(KEY_QA_CLICK, false)
-        set(value) = prefs.edit().putBoolean(KEY_QA_CLICK, value).apply()
+    var setupComplete: Boolean
+        get() = prefs.getBoolean("setup_complete", false)
+        set(value) = prefs.edit().putBoolean("setup_complete", value).apply()
+
+    var hudRefresh: Boolean
+        get() = prefs.getBoolean("hud_refresh", false)
+        set(value) = prefs.edit().putBoolean("hud_refresh", value).apply()
+    var hudBattery: Boolean
+        get() = prefs.getBoolean("hud_battery", false)
+        set(value) = prefs.edit().putBoolean("hud_battery", value).apply()
 
     var lastForegroundPackage: String
         get() = prefs.getString(KEY_LAST_PKG, "") ?: ""
@@ -51,8 +50,6 @@ class Prefs(context: Context) {
         const val KEY_LOCK = "lock_clocks"
         const val KEY_THERMAL = "thermal_override"
         const val KEY_REFRESH = "global_refresh_hz"
-        const val KEY_ADS_ENABLED = "ads_enabled"
-        const val KEY_QA_CLICK = "qa_click_test"
         const val KEY_LAST_PKG = "last_foreground_pkg"
     }
 }

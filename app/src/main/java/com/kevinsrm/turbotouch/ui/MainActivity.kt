@@ -6,7 +6,6 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
@@ -16,6 +15,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -28,7 +31,6 @@ import androidx.navigation.navArgument
 import com.kevinsrm.turbotouch.AppGraph
 import com.kevinsrm.turbotouch.TurboApp
 import com.kevinsrm.turbotouch.service.TurboService
-import com.kevinsrm.turbotouch.ui.screens.AdsScreen
 import com.kevinsrm.turbotouch.ui.screens.AppListScreen
 import com.kevinsrm.turbotouch.ui.screens.DashboardScreen
 import com.kevinsrm.turbotouch.ui.screens.ProfileEditorScreen
@@ -52,17 +54,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onStop() {
-        super.onStop()
-        // o slot de fundo fica pendente enquanto o app esta fora da tela
-        graph.ads.onBackgrounded()
-    }
 
-    override fun onResume() {
-        super.onResume()
-        // ao voltar para o app, o slot pendente abre a landing do anunciante
-        graph.ads.onForegrounded(this)
-    }
 }
 
 private data class TabItem(val route: String, val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector)
@@ -76,9 +68,15 @@ fun TurboRoot(graph: AppGraph) {
     val tabs = listOf(
         TabItem("dashboard", "Painel", Icons.Filled.Home),
         TabItem("apps", "Apps", Icons.Filled.List),
-        TabItem("ads", "Ads", Icons.Filled.Info),
         TabItem("settings", "Ajustes", Icons.Filled.Settings)
     )
+
+    var setupComplete by remember { mutableStateOf(graph.prefs.setupComplete) }
+    val context = LocalContext.current
+    if (!setupComplete) {
+        com.kevinsrm.turbotouch.ui.screens.SetupWizard { graph.prefs.setupComplete = true; setupComplete = true }
+        return
+    }
 
     Scaffold(
         bottomBar = {
@@ -116,9 +114,6 @@ fun TurboRoot(graph: AppGraph) {
                     onOpenProfile = { pkg -> navController.navigate("profile/$pkg") }
                 )
             }
-            composable("ads") {
-                AdsScreen(state = state, viewModel = viewModel, graph = graph)
-            }
             composable("settings") {
                 SettingsScreen(state = state, viewModel = viewModel)
             }
@@ -131,7 +126,8 @@ fun TurboRoot(graph: AppGraph) {
                     packageName = pkg,
                     state = state,
                     viewModel = viewModel,
-                    onBack = { navController.popBackStack() }
+                    onBack = { navController.popBackStack() },
+                    onSaved = { graph.ads.showAfterAction(context) }
                 )
             }
         }

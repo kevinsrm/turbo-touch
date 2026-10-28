@@ -10,6 +10,8 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.os.Handler
+import android.os.Looper
 import androidx.core.app.NotificationCompat
 import com.kevinsrm.turbotouch.AppGraph
 import com.kevinsrm.turbotouch.R
@@ -33,6 +35,15 @@ class TurboService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private lateinit var graph: AppGraph
 
+    private lateinit var overlay: MonitorOverlay
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val overlayTick = object : Runnable {
+        override fun run() {
+            overlay.update()
+            mainHandler.postDelayed(this, 2000L)
+        }
+    }
+
     private var lastGlobalRefresh: Int = -1
     private var lastLockClocks: Boolean? = null
     private var lastThermal: Boolean? = null
@@ -40,6 +51,8 @@ class TurboService : Service() {
     override fun onCreate() {
         super.onCreate()
         graph = (application as TurboApp).graph
+        overlay = MonitorOverlay(this, graph.prefs)
+        mainHandler.post(overlayTick)
         createChannel()
         startInForeground()
         scope.launch { monitorLoop() }
@@ -57,6 +70,8 @@ class TurboService : Service() {
 
     override fun onDestroy() {
         scope.cancel()
+        mainHandler.removeCallbacks(overlayTick)
+        overlay.close()
         super.onDestroy()
     }
 
@@ -76,6 +91,18 @@ class TurboService : Service() {
     private suspend fun monitorLoop() {
         while (scope.isActive) {
             try {
+                val requestedMode = graph.prefs.executionMode
+                if (requestedMode != graph.shell.mode) {
+                    // Reverta usando o modo anterior antes de trocar as credenciais.
+                    graph.engine.revertEverything()
+                    if (lastLockClocks == true) graph.power.setFixedPerformance(false)
+                    if (lastThermal == true) graph.power.setThermalOverride(false)
+                    graph.refresh.restore()
+                    graph.shell.mode = requestedMode
+                    lastGlobalRefresh = -1
+                    lastLockClocks = null
+                    lastThermal = null
+                }
                 val root = graph.shell.hasRoot()
                 val packageName = graph.foreground.currentPackage(root)
                 if (packageName != null) {

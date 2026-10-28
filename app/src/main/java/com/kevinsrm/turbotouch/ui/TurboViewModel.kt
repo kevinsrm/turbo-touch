@@ -11,7 +11,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.kevinsrm.turbotouch.AppGraph
 import com.kevinsrm.turbotouch.TurboApp
-import com.kevinsrm.turbotouch.ads.AdConfig
+import com.kevinsrm.turbotouch.core.ExecutionMode
 import com.kevinsrm.turbotouch.core.CommandEntry
 import com.kevinsrm.turbotouch.core.CommandLog
 import com.kevinsrm.turbotouch.data.InstalledApp
@@ -38,8 +38,9 @@ data class TurboUiState(
     val profiles: Map<String, AppProfile> = emptyMap(),
     val installedApps: List<InstalledApp> = emptyList(),
     val log: List<CommandEntry> = emptyList(),
-    val adsConfig: AdConfig = AdConfig(),
-    val adsEnabled: Boolean = false,
+    val executionMode: ExecutionMode = ExecutionMode.STANDARD,
+    val hudRefresh: Boolean = false,
+    val hudBattery: Boolean = false,
     val globalRefreshHz: Int = 0,
     val lockClocks: Boolean = false,
     val thermalOverride: Boolean = false,
@@ -83,8 +84,9 @@ class TurboViewModel(app: Application) : AndroidViewModel(app) {
             profiles = graph.profiles.all(),
             installedApps = apps,
             log = CommandLog.entries.value,
-            adsConfig = graph.ads.currentConfig(),
-            adsEnabled = graph.ads.isEnabled(),
+            executionMode = graph.prefs.executionMode,
+            hudRefresh = graph.prefs.hudRefresh,
+            hudBattery = graph.prefs.hudBattery,
             globalRefreshHz = graph.prefs.globalRefreshHz,
             lockClocks = graph.prefs.lockClocksGlobal,
             thermalOverride = graph.prefs.thermalOverride,
@@ -138,23 +140,20 @@ class TurboViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { refresh() }
     }
 
-    fun reloadAds() {
-        val config = graph.ads.reload()
-        _state.value = _state.value.copy(adsConfig = config, adsEnabled = graph.ads.isEnabled())
+    fun setExecutionMode(mode: ExecutionMode) {
+        graph.prefs.executionMode = mode
+        if (!graph.prefs.serviceEnabled) graph.shell.mode = mode
+        _state.value = _state.value.copy(executionMode = mode)
     }
 
-    fun saveAdsConfig(config: AdConfig) {
-        AdConfig.saveOverride(getApplication(), config.asProperties())
-        reloadAds()
+    fun setHudRefresh(enabled: Boolean) {
+        graph.prefs.hudRefresh = enabled
+        _state.value = _state.value.copy(hudRefresh = enabled)
     }
 
-    fun setAdsEnabled(enabled: Boolean) {
-        graph.prefs.adsEnabledOverride = enabled
-        reloadAds()
-    }
-
-    fun setQaClickTest(enabled: Boolean) {
-        graph.prefs.qaClickTest = enabled
+    fun setHudBattery(enabled: Boolean) {
+        graph.prefs.hudBattery = enabled
+        _state.value = _state.value.copy(hudBattery = enabled)
     }
 
     fun clearLog() {

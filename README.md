@@ -11,9 +11,9 @@ que voce escolheu — e o app desfaz tudo quando ele sai de primeiro plano.
 | App de mensagens | `cmd deviceidle force-idle` + `RUN_ANY_IN_BACKGROUND ignore` (economia agressiva) enquanto ele esta aberto, restaurado ao sair |
 | Monitoramento | servico em primeiro plano com notificacao persistente, religado no boot |
 
-O app tambem traz um **modulo de anuncios** com arquivo de configuracao pronto para
-suas credenciais e uma rede que **nao exige o app em loja de aplicativos nem aprovacao**
-(detalhes em [docs/ADS.md](docs/ADS.md)).
+Após salvar um perfil, o app pode apresentar uma oferta patrocinada identificada;
+a abertura do smartlink Adsterra no navegador é opcional e limitada a uma oferta
+a cada dois minutos enquanto o processo estiver ativo.
 
 ---
 
@@ -21,18 +21,15 @@ suas credenciais e uma rede que **nao exige o app em loja de aplicativos nem apr
 
 ```
 turbo-touch/
-├── ads_config.properties          <- arquivo de credenciais (preencha aqui)
-├── ads_config.properties.example  <- copia de referencia
 ├── settings.gradle.kts
 ├── build.gradle.kts
 ├── gradle/libs.versions.toml
 ├── gradlew                       <- regenera o wrapper se o jar faltar
 ├── docs/
 │   ├── BUILD.md
-│   ├── ADS.md
 │   └── PER_APP_PROFILES.md
 └── app/
-    ├── build.gradle.kts           <- task que gera o assets/ads_config.properties
+    ├── build.gradle.kts
     ├── proguard-rules.pro
     └── src/main/
         ├── AndroidManifest.xml
@@ -42,8 +39,8 @@ turbo-touch/
         │   ├── profile/               (refresh, power, cpu/gpu, watcher, engine)
         │   ├── service/               (TurboService em primeiro plano + boot)
         │   ├── data/                  (preferencias, lista de apps)
-        │   ├── ads/                   (config, provedores, slots, harness de clique)
-        │   └── ui/                    (Compose: painel, apps, perfil, ads, ajustes)
+        │   ├── ads/                   (oferta patrocinada no navegador)
+        │   └── ui/                    (Compose: painel, apps, perfil, ajustes)
         └── res/
 ```
 
@@ -98,35 +95,17 @@ Matriz completa em [docs/PER_APP_PROFILES.md](docs/PER_APP_PROFILES.md).
 
 ---
 
-## Anuncios
+## Configuração e limitações
 
-Preencha `ads_config.properties` na raiz e reconstrua:
+No primeiro uso, o assistente explica notificações, acesso ao uso, otimização de
+bateria e sobreposição; as permissões podem ser puladas. Em Ajustes escolha Root
+ou Sem root (padrão). A troca tenta reverter o perfil e os ajustes globais antes
+de passar ao novo modo, mas comandos de reversão podem falhar no dispositivo;
+verifique o histórico. O modo sem root nunca chama `su` para comandos privilegiados.
 
-```properties
-ads.enabled=true
-ads.provider=smartlink
-ads.smartlink.url=https://smart.adsterra.com/smartlink/SEU_ZONE_ID
-```
-
-O arquivo e lido no build, vira `assets/ads_config.properties` dentro do APK e pode
-ser sobrescrito em tempo de execucao pela tela **Ads** do proprio app (as credenciais
-ficam em `filesDir/ads_config_override.properties`).
-
-Provedores embutidos:
-
-* `smartlink` — Adsterra / Monetag / PropellerAds "Direct Link". Sem SDK, sem loja de
-  aplicativos, sem aprovacao de SDK. Entrega banner + slot de fundo.
-* `admob` — Google Mobile Ads (banner + interstitial). Exige o app publicado no Google
-  Play para servir em producao.
-* `reflective` — liga qualquer outro SDK por nome de classe, sem dependencia de
-  compilacao.
-
-O harness **"Testar clique (QA)"** dispara um toque sintetico no seu proprio placement
-e confirma se o caminho de clique chegou no SDK. Ele serve para validar a integracao
-nos seus ids de teste — nao gera clique em trafego real.
-
----
-
-## Licenca
-
-Codigo de exemplo. Use como base do seu projeto.
+O HUD depende da permissão de sobreposição e do serviço de monitoramento. Ele
+mostra Hz do display e nível, temperatura e corrente da bateria quando reportados
+pelo aparelho; corrente positiva ou negativa segue a convenção do dispositivo.
+FPS de outros apps e uso global de CPU/GPU não são fornecidos por este HUD.
+Depuração Wi-Fi/pareamento ADB e notificação interativa ainda não foram
+implementados. Nenhum privilégio ADB é simulado ou obtido via Shizuku.

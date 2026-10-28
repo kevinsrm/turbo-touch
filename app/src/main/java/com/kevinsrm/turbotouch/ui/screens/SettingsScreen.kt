@@ -15,6 +15,13 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.FilterChip
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.kevinsrm.turbotouch.core.ExecutionMode
+import com.kevinsrm.turbotouch.ui.SwitchRow
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -45,6 +52,23 @@ fun SettingsScreen(state: TurboUiState, viewModel: TurboViewModel) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        SectionCard("Modo de execução") {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(selected = state.executionMode == ExecutionMode.ROOT,
+                    onClick = { viewModel.setExecutionMode(ExecutionMode.ROOT) }, label = { Text("Root") })
+                FilterChip(selected = state.executionMode == ExecutionMode.STANDARD,
+                    onClick = { viewModel.setExecutionMode(ExecutionMode.STANDARD) }, label = { Text("Sem root") })
+            }
+            Text("Depuração Wi-Fi: ainda não disponível. Nenhum pareamento ou comando ADB será executado.", style = MaterialTheme.typography.bodySmall)
+        }
+        SectionCard("Monitor flutuante") {
+            Text("Requer permissão de sobreposição e monitor ativo.", style = MaterialTheme.typography.bodySmall)
+            SwitchRow("Taxa da tela", checked = state.hudRefresh, onCheckedChange = viewModel::setHudRefresh)
+            SwitchRow("Bateria", subtitle = "Nível, temperatura e corrente reportados pelo aparelho", checked = state.hudBattery, onCheckedChange = viewModel::setHudBattery)
+            Text("FPS de outros apps e uso de CPU/GPU não estão disponíveis por APIs públicas confiáveis.", style = MaterialTheme.typography.bodySmall)
+            OutlinedButton(onClick = { openIntent(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}"))) }) { Text("Permitir sobreposição") }
+        }
+
         SectionCard("Permissoes") {
             InfoRow(
                 "Root",
@@ -74,6 +98,11 @@ fun SettingsScreen(state: TurboUiState, viewModel: TurboViewModel) {
                 }) {
                     Text("Ajustar settings")
                 }
+            }
+            OutlinedButton(onClick = {
+                openIntent(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName))
+            }) {
+                Text("Notificações")
             }
             OutlinedButton(onClick = {
                 openIntent(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))

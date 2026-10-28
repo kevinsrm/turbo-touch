@@ -1,3 +1,1 @@
--keep class com.google.android.gms.ads.** { *; }
--keepattributes *Annotation*
--dontwarn com.google.android.gms.**
+# Regras especificas do aplicativo.

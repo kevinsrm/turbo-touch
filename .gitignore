@@ -13,6 +13,3 @@ gradle-wrapper.jar
 # Keystores
 *.jks
 *.keystore
-
-# Local ad-network overrides (real zone ids / keys live here)
-ads_config.local.properties

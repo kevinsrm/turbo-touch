@@ -1,6 +1,9 @@
 package com.kevinsrm.turbotouch.ui.screens
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.viewinterop.AndroidView
+import android.widget.ImageView
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -67,6 +70,18 @@ fun AppListScreen(
                         modifier = Modifier.padding(14.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        AndroidView(
+                            factory = { context -> ImageView(context).apply {
+                                scaleType = ImageView.ScaleType.FIT_CENTER
+                            } },
+                            update = { image ->
+                                image.setImageDrawable(runCatching {
+                                    image.context.packageManager.getApplicationIcon(app.packageName)
+                                }.getOrElse { image.context.packageManager.defaultActivityIcon })
+                                image.contentDescription = "Icone de ${app.label}"
+                            },
+                            modifier = Modifier.size(48.dp).padding(end = 8.dp)
+                        )
                         Column(modifier = Modifier.weight(1f)) {
                             Text(app.label, style = MaterialTheme.typography.titleSmall)
                             Text(

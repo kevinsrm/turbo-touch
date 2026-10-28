@@ -38,16 +38,6 @@ deste projeto faz uma de duas coisas:
 
 Abrindo o projeto no Android Studio, o IDE gera o wrapper sozinho.
 
-## Task de configuracao de anuncios
-
-`app/build.gradle.kts` registra a task `generateAdsConfig`, que le
-
-1. `ads_config.properties` (raiz, versionado) e
-2. `ads_config.local.properties` (raiz, ignorado pelo git, tem precedencia)
-
-e escreve `app/build/generated/ads/ads_config.properties`, que entra no APK como asset.
-A task roda antes de `mergeAssets` de cada variante.
-
 ## O que o build **nao** faz
 
 * nao assina nada: `assembleRelease` gera APK unsigned. Configure o `signingConfigs`
