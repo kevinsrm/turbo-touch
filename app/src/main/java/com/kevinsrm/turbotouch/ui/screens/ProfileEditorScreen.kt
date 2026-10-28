@@ -47,7 +47,8 @@ fun ProfileEditorScreen(
     packageName: String,
     state: TurboUiState,
     viewModel: TurboViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onSaved: () -> Unit
 ) {
     val existing = state.profiles[packageName]
 
@@ -172,6 +173,7 @@ fun ProfileEditorScreen(
                     onClick = {
                         viewModel.saveProfile(draft)
                         onBack()
+                        onSaved()
                     },
                     modifier = Modifier.weight(1f)
                 ) {

@@ -9,12 +9,13 @@ import kotlinx.coroutines.withContext
  * A leitura de stdout e stderr acontece em um unico stream (redirectErrorStream),
  * assim nao existe risco de deadlock quando o processo escreve muito em stderr.
  */
-class RootShell {
+class RootShell(@Volatile var mode: ExecutionMode = ExecutionMode.STANDARD) {
 
     @Volatile
     private var rootState: Boolean? = null
 
     suspend fun hasRoot(): Boolean = withContext(Dispatchers.IO) {
+        if (mode != ExecutionMode.ROOT) return@withContext false
         rootState ?: run {
             val probe = execRaw("id", asRoot = true)
             val ok = probe.ok && (probe.stdout.contains("uid=0") || probe.stdout.contains("uid=0("))
@@ -28,7 +29,11 @@ class RootShell {
     }
 
     suspend fun exec(command: String): ShellResult {
-        val result = withContext(Dispatchers.IO) { execRaw(command, asRoot = true) }
+        val result = if (mode == ExecutionMode.ROOT) {
+            withContext(Dispatchers.IO) { execRaw(command, asRoot = true) }
+        } else {
+            ShellResult(-1, "", "Comando privilegiado indisponivel no modo sem root")
+        }
         CommandLog.record(command, result)
         return result
     }
@@ -54,3 +59,6 @@ class RootShell {
         }
     }
 }
+
+/** ADB Wi-Fi nao esta implementado; nunca executar comandos privilegiados como fallback. */
+enum class ExecutionMode { ROOT, STANDARD }

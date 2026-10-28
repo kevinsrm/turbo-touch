@@ -27,17 +27,13 @@ class TurboApp : Application() {
 class AppGraph(context: Context) {
 
     val appContext: Context = context.applicationContext
-    val shell = RootShell()
     val prefs = Prefs(appContext)
+    val shell = RootShell(prefs.executionMode)
     val profiles = ProfileStore(appContext)
     val refresh = RefreshRateController(appContext, shell)
     val power = PowerController(shell)
     val cpuGpu = CpuGpuController(shell)
     val foreground = ForegroundWatcher(appContext, shell)
     val engine = ProfileEngine(refresh, power, cpuGpu, profiles)
-    val ads = AdSlotController(appContext, prefs)
-
-    init {
-        ads.reload()
-    }
+    val ads = AdSlotController()
 }
