@@ -30,9 +30,21 @@ class Prefs(context: Context) {
             .getOrDefault(ExecutionMode.STANDARD)
         set(value) = prefs.edit().putString("execution_mode", value.name).apply()
 
+    var adbConnectionPort: Int
+        get() = prefs.getInt("adb_connection_port", 0)
+        set(value) = prefs.edit().putInt("adb_connection_port", value.coerceIn(0, 65535)).apply()
+
     var setupComplete: Boolean
         get() = prefs.getBoolean("setup_complete", false)
         set(value) = prefs.edit().putBoolean("setup_complete", value).apply()
+
+    var hudFps: Boolean
+        get() = prefs.getBoolean("hud_fps", false)
+        set(value) = prefs.edit().putBoolean("hud_fps", value).apply()
+
+    var hudCpuGpu: Boolean
+        get() = prefs.getBoolean("hud_cpu_gpu", false)
+        set(value) = prefs.edit().putBoolean("hud_cpu_gpu", value).apply()
 
     var hudRefresh: Boolean
         get() = prefs.getBoolean("hud_refresh", false)

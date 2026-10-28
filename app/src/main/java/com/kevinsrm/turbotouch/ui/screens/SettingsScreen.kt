@@ -15,6 +15,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.FilterChip
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,10 +33,12 @@ import com.kevinsrm.turbotouch.ui.MonoText
 import com.kevinsrm.turbotouch.ui.SectionCard
 import com.kevinsrm.turbotouch.ui.TurboUiState
 import com.kevinsrm.turbotouch.ui.TurboViewModel
+import com.kevinsrm.turbotouch.service.TurboService
 
 @Composable
 fun SettingsScreen(state: TurboUiState, viewModel: TurboViewModel) {
     val context = LocalContext.current
+    var connectionPort by remember(state.adbConnectionPort) { mutableStateOf(state.adbConnectionPort.takeIf { it > 0 }?.toString().orEmpty()) }
 
     fun openIntent(intent: Intent) {
         try {
@@ -52,27 +55,52 @@ fun SettingsScreen(state: TurboUiState, viewModel: TurboViewModel) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        if (state.message.isNotBlank()) {
+            Text(state.message, color = MaterialTheme.colorScheme.error)
+        }
         SectionCard("Modo de execução") {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(selected = state.executionMode == ExecutionMode.ROOT,
                     onClick = { viewModel.setExecutionMode(ExecutionMode.ROOT) }, label = { Text("Root") })
                 FilterChip(selected = state.executionMode == ExecutionMode.STANDARD,
                     onClick = { viewModel.setExecutionMode(ExecutionMode.STANDARD) }, label = { Text("Sem root") })
+                FilterChip(selected = state.executionMode == ExecutionMode.ADB_WIFI,
+                    onClick = { viewModel.setExecutionMode(ExecutionMode.ADB_WIFI) }, label = { Text("ADB Wi-Fi") })
             }
-            Text("Depuração Wi-Fi: ainda não disponível. Nenhum pareamento ou comando ADB será executado.", style = MaterialTheme.typography.bodySmall)
+            Text("ADB Wireless executa comandos como uid shell (não root) no próprio aparelho, por loopback. Ative Depuração sem fio nas opções de desenvolvedor.", style = MaterialTheme.typography.bodySmall)
+            OutlinedTextField(
+                value = connectionPort,
+                onValueChange = { value -> connectionPort = value.filter(Char::isDigit).take(5) },
+                label = { Text("Porta de conexão ADB") },
+                supportingText = { Text("É diferente da porta temporária usada no pareamento.") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = {
+                    val port = connectionPort.toIntOrNull()
+                    if (port != null && port in 1..65535) viewModel.setAdbConnectionPort(port)
+                    else viewModel.showMessage("Informe a porta de conexão ADB exibida em Depuração sem fio.")
+                }) { Text("Salvar porta") }
+                OutlinedButton(onClick = { TurboService.requestPairing(context) }) { Text("Parear por notificação") }
+                OutlinedButton(onClick = { openIntent(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)) }) { Text("Opções de desenvolvedor") }
+            }
+            Text("A notificação permite informar o código de 6 dígitos e a porta temporária. Após parear, informe a porta de conexão mostrada na tela principal de Depuração sem fio.", style = MaterialTheme.typography.bodySmall)
         }
         SectionCard("Monitor flutuante") {
             Text("Requer permissão de sobreposição e monitor ativo.", style = MaterialTheme.typography.bodySmall)
+            SwitchRow("FPS", subtitle = "Medição best-effort via SurfaceFlinger (requer Root ou ADB Wi-Fi)", checked = state.hudFps, onCheckedChange = viewModel::setHudFps)
             SwitchRow("Taxa da tela", checked = state.hudRefresh, onCheckedChange = viewModel::setHudRefresh)
             SwitchRow("Bateria", subtitle = "Nível, temperatura e corrente reportados pelo aparelho", checked = state.hudBattery, onCheckedChange = viewModel::setHudBattery)
-            Text("FPS de outros apps e uso de CPU/GPU não estão disponíveis por APIs públicas confiáveis.", style = MaterialTheme.typography.bodySmall)
+            SwitchRow("CPU e GPU", subtitle = "CPU via /proc/stat; GPU via interfaces do fabricante, quando expostas", checked = state.hudCpuGpu, onCheckedChange = viewModel::setHudCpuGpu)
             OutlinedButton(onClick = { openIntent(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}"))) }) { Text("Permitir sobreposição") }
         }
 
         SectionCard("Permissoes") {
             InfoRow(
                 "Root",
-                if (state.rootAvailable) "disponivel" else "sem root: modo reduzido (refresh global via WRITE_SETTINGS)"
+                if (state.rootAvailable) "disponivel" else if (state.executionMode == ExecutionMode.ADB_WIFI) "ADB Wi-Fi usa uid shell, não concede root"
+                    else "sem root: modo reduzido (refresh global via WRITE_SETTINGS)"
             )
             InfoRow(
                 "Acesso a dados de uso",
@@ -130,8 +158,7 @@ fun SettingsScreen(state: TurboUiState, viewModel: TurboViewModel) {
             InfoRow("Versao", "1.0.0")
             Divider()
             Text(
-                "Perfil de hardware por aplicativo: refresh do painel, modo de game, " +
-                    "lock de clocks, economia agressiva e boost de GPU/GPU.",
+                "Perfil por app e HUD. O FPS depende do acesso ao SurfaceFlinger; uso de GPU pode não estar exposto em alguns fabricantes.",
                 style = MaterialTheme.typography.bodySmall
             )
         }

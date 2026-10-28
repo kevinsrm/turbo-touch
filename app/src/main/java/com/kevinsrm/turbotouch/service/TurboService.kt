@@ -10,9 +10,9 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
-import android.os.Handler
-import android.os.Looper
 import androidx.core.app.NotificationCompat
+import androidx.core.app.RemoteInput
+import com.flyfishxu.kadb.Kadb
 import com.kevinsrm.turbotouch.AppGraph
 import com.kevinsrm.turbotouch.R
 import com.kevinsrm.turbotouch.TurboApp
@@ -25,6 +25,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Servico em primeiro plano que vigia o app em primeiro plano e aplica o
@@ -36,13 +37,10 @@ class TurboService : Service() {
     private lateinit var graph: AppGraph
 
     private lateinit var overlay: MonitorOverlay
-    private val mainHandler = Handler(Looper.getMainLooper())
-    private val overlayTick = object : Runnable {
-        override fun run() {
-            overlay.update()
-            mainHandler.postDelayed(this, 2000L)
-        }
-    }
+
+    private var pendingPairCode: String? = null
+    private var pendingPairPort: Int? = null
+    private var notificationStatus: String? = null
 
     private var lastGlobalRefresh: Int = -1
     private var lastLockClocks: Boolean? = null
@@ -52,16 +50,37 @@ class TurboService : Service() {
         super.onCreate()
         graph = (application as TurboApp).graph
         overlay = MonitorOverlay(this, graph.prefs)
-        mainHandler.post(overlayTick)
         createChannel()
         startInForeground()
         scope.launch { monitorLoop() }
+        scope.launch {
+            val metrics = MonitorMetrics(graph.shell, graph.prefs)
+            while (isActive) {
+                val snapshot = runCatching { metrics.sample() }.getOrDefault(MonitorMetrics.Snapshot("n/d", "n/d", "n/d"))
+                withContext(Dispatchers.Main) { overlay.update(snapshot) }
+                delay(2000L)
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_STOP) {
-            stopSelf()
-            return START_NOT_STICKY
+        when (intent?.action) {
+            ACTION_STOP -> {
+                stopSelf()
+                return START_NOT_STICKY
+            }
+            ACTION_PAIR_CODE -> {
+                pendingPairCode = intent.getStringExtra(EXTRA_REMOTE_VALUE)?.trim()
+                acceptPairInput()
+            }
+            ACTION_PAIR_PORT -> {
+                pendingPairPort = intent.getStringExtra(EXTRA_REMOTE_VALUE)?.toIntOrNull()
+                acceptPairInput()
+            }
+            ACTION_SHOW_PAIRING -> {
+                notificationStatus = "Digite código de 6 dígitos e porta de pareamento nas ações abaixo."
+                showPairingNotification()
+            }
         }
         return START_STICKY
     }
@@ -70,7 +89,6 @@ class TurboService : Service() {
 
     override fun onDestroy() {
         scope.cancel()
-        mainHandler.removeCallbacks(overlayTick)
         overlay.close()
         super.onDestroy()
     }
@@ -155,6 +173,15 @@ class TurboService : Service() {
             setShowBadge(false)
         }
         manager.createNotificationChannel(channel)
+        val pairingChannel = NotificationChannel(
+            PAIRING_CHANNEL_ID,
+            "Pareamento ADB Wi-Fi",
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = "Entrada interativa do código e porta temporários do ADB Wireless"
+            setShowBadge(false)
+        }
+        manager.createNotificationChannel(pairingChannel)
     }
 
     private fun buildNotification(): Notification {
@@ -166,7 +193,7 @@ class TurboService : Service() {
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(R.string.notification_title))
-            .setContentText(getString(R.string.notification_text))
+            .setContentText(notificationStatus ?: getString(R.string.notification_text))
             .setSmallIcon(R.drawable.ic_stat_turbo)
             .setContentIntent(contentIntent)
             .setOngoing(true)
@@ -175,11 +202,90 @@ class TurboService : Service() {
             .build()
     }
 
+    private fun pairInputAction(action: String, remoteKey: String, label: String, requestCode: Int): NotificationCompat.Action {
+        val reply = RemoteInput.Builder(remoteKey).setLabel(label).build()
+        val pending = PendingIntent.getBroadcast(
+            this,
+            requestCode,
+            Intent(this, AdbPairInputReceiver::class.java).setAction(action),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+        )
+        return NotificationCompat.Action.Builder(R.drawable.ic_stat_turbo, label, pending)
+            .addRemoteInput(reply)
+            .setAllowGeneratedReplies(false)
+            .build()
+    }
+
+    private fun updateNotification() {
+        getSystemService(NotificationManager::class.java)?.notify(NOTIFICATION_ID, buildNotification())
+        if (notificationStatus != null) showPairingNotification()
+    }
+
+    private fun showPairingNotification() {
+        val notification = NotificationCompat.Builder(this, PAIRING_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_stat_turbo)
+            .setContentTitle("Pareamento ADB Wi-Fi")
+            .setContentText(notificationStatus)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setOngoing(true)
+            .addAction(pairInputAction(ACTION_PAIR_CODE, REMOTE_CODE, "Código de 6 dígitos", 4202))
+            .addAction(pairInputAction(ACTION_PAIR_PORT, REMOTE_PORT, "Porta de pareamento", 4203))
+            .build()
+        getSystemService(NotificationManager::class.java)?.notify(PAIRING_NOTIFICATION_ID, notification)
+    }
+
+    private fun acceptPairInput() {
+        val code = pendingPairCode
+        val port = pendingPairPort
+        if (code == null || port == null) {
+            notificationStatus = if (code == null) "Informe o código de pareamento de 6 dígitos."
+                else "Informe a porta mostrada no diálogo de pareamento Wi-Fi."
+            updateNotification()
+            return
+        }
+        pendingPairCode = null
+        pendingPairPort = null
+        if (!code.matches(Regex("\\d{6}")) || port !in 1..65535) {
+            notificationStatus = "Código ou porta inválidos. Digite-os novamente nas ações da notificação."
+            updateNotification()
+            return
+        }
+        notificationStatus = "Pareando com 127.0.0.1:$port…"
+        updateNotification()
+        scope.launch {
+            val outcome = runCatching { Kadb.pair("127.0.0.1", port, code) }
+            notificationStatus = if (outcome.isSuccess) {
+                "Pareamento ADB concluído. Configure a porta de conexão em Ajustes."
+            } else {
+                "Falha no pareamento. Confira Depuração Wi-Fi, código e porta."
+            }
+            updateNotification()
+        }
+    }
+
     companion object {
         private const val CHANNEL_ID = "turbo_monitor"
+        private const val PAIRING_CHANNEL_ID = "adb_pairing"
         private const val NOTIFICATION_ID = 4201
+        private const val PAIRING_NOTIFICATION_ID = 4202
         private const val POLL_INTERVAL_MS = 900L
         const val ACTION_STOP = "com.kevinsrm.turbotouch.STOP"
+        const val ACTION_SHOW_PAIRING = "com.kevinsrm.turbotouch.SHOW_ADB_PAIRING"
+        const val ACTION_PAIR_CODE = "com.kevinsrm.turbotouch.PAIR_CODE"
+        const val ACTION_PAIR_PORT = "com.kevinsrm.turbotouch.PAIR_PORT"
+        const val REMOTE_CODE = "adb_pair_code"
+        const val REMOTE_PORT = "adb_pair_port"
+        const val EXTRA_REMOTE_VALUE = "remote_value"
+
+        fun requestPairing(context: Context) {
+            val intent = Intent(context, TurboService::class.java).setAction(ACTION_SHOW_PAIRING)
+            try {
+                androidx.core.content.ContextCompat.startForegroundService(context, intent)
+            } catch (_: Throwable) {
+                // The user can reopen the app and retry if Android blocks FGS startup.
+            }
+        }
 
         fun start(context: Context) {
             val intent = Intent(context, TurboService::class.java)

@@ -1,15 +1,23 @@
 package com.kevinsrm.turbotouch.core
 
+import com.flyfishxu.kadb.Kadb
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Execucao de comandos de shell, com ou sem root.
- *
- * A leitura de stdout e stderr acontece em um unico stream (redirectErrorStream),
- * assim nao existe risco de deadlock quando o processo escreve muito em stderr.
+ * Execucao de comandos pelo shell do sistema, root tradicional ou ADB Wireless.
+ * O modo ADB nunca tenta `su`: comandos seguem como uid shell (normalmente 2000).
  */
-class RootShell(@Volatile var mode: ExecutionMode = ExecutionMode.STANDARD) {
+class RootShell(
+    initialMode: ExecutionMode = ExecutionMode.STANDARD,
+    private val adbPortProvider: () -> Int? = { null }
+) {
+    @Volatile
+    var mode: ExecutionMode = initialMode
+        set(value) {
+            field = value
+            rootState = null
+        }
 
     @Volatile
     private var rootState: Boolean? = null
@@ -28,13 +36,14 @@ class RootShell(@Volatile var mode: ExecutionMode = ExecutionMode.STANDARD) {
         rootState = null
     }
 
-    suspend fun exec(command: String): ShellResult {
-        val result = if (mode == ExecutionMode.ROOT) {
-            withContext(Dispatchers.IO) { execRaw(command, asRoot = true) }
-        } else {
-            ShellResult(-1, "", "Comando privilegiado indisponivel no modo sem root")
+    suspend fun exec(command: String, record: Boolean = true): ShellResult {
+        val activeMode = mode
+        val result = when (activeMode) {
+            ExecutionMode.ROOT -> withContext(Dispatchers.IO) { execRaw(command, asRoot = true) }
+            ExecutionMode.ADB_WIFI -> withContext(Dispatchers.IO) { execAdb(command) }
+            ExecutionMode.STANDARD -> ShellResult(-1, "", "Comando privilegiado indisponivel no modo sem root")
         }
-        CommandLog.record(command, result)
+        if (record) CommandLog.record(command, result)
         return result
     }
 
@@ -42,6 +51,20 @@ class RootShell(@Volatile var mode: ExecutionMode = ExecutionMode.STANDARD) {
         val result = withContext(Dispatchers.IO) { execRaw(command, asRoot = false) }
         CommandLog.record(command, result)
         return result
+    }
+
+    private fun execAdb(command: String): ShellResult {
+        val port = adbPortProvider()
+            ?: return ShellResult(-1, "", "Informe a porta de conexão ADB após o pareamento Wi-Fi")
+        return try {
+            require(port in 1..65535) { "Porta ADB inválida" }
+            Kadb.create("127.0.0.1", port, connectTimeout = ADB_TIMEOUT_MS, socketTimeout = ADB_TIMEOUT_MS).use { adb ->
+                val response = adb.shell(command)
+                ShellResult(response.exitCode, response.output, response.errorOutput)
+            }
+        } catch (t: Throwable) {
+            ShellResult(-1, "", t.message ?: "Falha ao executar comando ADB local")
+        }
     }
 
     private fun execRaw(command: String, asRoot: Boolean): ShellResult {
@@ -58,7 +81,10 @@ class RootShell(@Volatile var mode: ExecutionMode = ExecutionMode.STANDARD) {
             ShellResult(-1, "", t.message ?: "exec failed: ${t::class.java.simpleName}")
         }
     }
+
+    companion object {
+        private const val ADB_TIMEOUT_MS = 5_000
+    }
 }
 
-/** ADB Wi-Fi nao esta implementado; nunca executar comandos privilegiados como fallback. */
-enum class ExecutionMode { ROOT, STANDARD }
+enum class ExecutionMode { ROOT, STANDARD, ADB_WIFI }
