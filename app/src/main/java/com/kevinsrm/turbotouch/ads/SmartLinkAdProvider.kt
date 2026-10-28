@@ -28,6 +28,7 @@ class SmartLinkAdProvider : AdProvider {
 
     override fun loadBanner(container: FrameLayout): Boolean {
         if (url.isBlank()) return false
+        val context = container.context
         container.removeAllViews()
         val bar = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL

@@ -59,12 +59,12 @@ class AdMobAdProvider : AdProvider {
         if (!initialized || bannerUnit.isBlank()) return false
         val adView = AdView(container.context)
         adView.adUnitId = bannerUnit
-        adView.adSize = AdSize.BANNER
-        adView.setOnAdListener(object : AdListener() {
+        adView.setAdSize(AdSize.BANNER)
+        adView.adListener = object : AdListener() {
             override fun onAdClicked() {
                 onAdClick?.invoke()
             }
-        })
+        }
         container.removeAllViews()
         container.addView(
             adView,

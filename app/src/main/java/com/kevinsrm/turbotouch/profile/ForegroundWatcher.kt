@@ -34,8 +34,9 @@ class ForegroundWatcher(
         val now = System.currentTimeMillis()
         val events = usage.queryEvents(now - 10_000L, now)
         var last: String? = null
+        val event = UsageEvents.Event()
         while (events.hasNextEvent()) {
-            val event = events.nextEvent()
+            events.getNextEvent(event)
             if (event.eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
                 last = event.packageName
             }
