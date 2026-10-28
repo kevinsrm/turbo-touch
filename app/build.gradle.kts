@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.kevinsrm.turbotouch"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.kevinsrm.turbotouch"
@@ -36,9 +36,11 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
+   /* kotlinOptions {
         jvmTarget = "17"
     }
+    */
+    kotlin{compilerOptions{jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)}}
 
     buildFeatures {
         compose = true

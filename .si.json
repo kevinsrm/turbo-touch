@@ -1,0 +1,22 @@
+{
+  "plugin": "org.smartide.plugin.android",
+  "run": "./gradlew app:assembleDebug",
+  "intelligence": {
+    ".kt": {
+      "enabled": true,
+      "run": "kotlin-language-server"
+    },
+    ".kts": {
+      "enabled": true,
+      "run": "kotlin-language-server"
+    },
+    ".properties": {
+      "enabled": false,
+      "run": "lemminx"
+    },
+    ".json": {
+      "enabled": true,
+      "run": "vscode-json-language-server --stdio"
+    }
+  }
+}
