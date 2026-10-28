@@ -92,6 +92,9 @@ class TurboService : Service() {
     override fun onDestroy() {
         scope.cancel()
         overlay.close()
+        // Encerra a sessao ADB persistente: sem isso o aviso "Depuracao por Wi-Fi
+        // conectada" ficaria ativo depois de parar o monitor.
+        graph.shell.releaseAdb()
         super.onDestroy()
     }
 
@@ -130,6 +133,9 @@ class TurboService : Service() {
                     graph.engine.onForegroundChanged(packageName)
                 }
                 applyGlobals()
+                // Com o monitor desligado a sessao ADB fica ociosa e e liberada,
+                // fazendo o aviso do sistema desaparecer.
+                graph.shell.releaseAdbIfIdle()
             } catch (t: Throwable) {
                 // um comando quebrado nunca derruba o loop
             }
