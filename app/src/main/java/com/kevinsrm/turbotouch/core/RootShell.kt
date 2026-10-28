@@ -1,6 +1,8 @@
 package com.kevinsrm.turbotouch.core
 
+import android.os.SystemClock
 import com.flyfishxu.kadb.Kadb
+import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -9,6 +11,11 @@ import kotlinx.coroutines.withContext
 /**
  * Execucao de comandos pelo shell do sistema, root tradicional ou ADB Wireless.
  * O modo ADB nunca tenta `su`: comandos seguem como uid shell (normalmente 2000).
+ *
+ * A conexao ADB e **persistente** por porta. Abrir um cliente novo a cada comando
+ * (como antes) fazia o `adbd` anunciar "Depuracao por Wi-Fi conectada" e retirar a
+ * notificacao a cada handshake — o monitor de FPS roda a cada 2 s, entao o historico
+ * de notificacoes enchia de avisos piscando.
  */
 class RootShell(
     initialMode: ExecutionMode = ExecutionMode.STANDARD,
@@ -19,12 +26,19 @@ class RootShell(
         set(value) {
             field = value
             rootState = null
+            releaseAdb()
         }
 
     @Volatile
     private var rootState: Boolean? = null
 
     private val adbMutex = Mutex()
+
+    /** Cliente ADB reaproveitado entre comandos; recriado so quando a porta muda. */
+    private var adbClient: Kadb? = null
+    private var adbClientPort: Int = 0
+    private var lastAdbUseMs: Long = 0L
+    private var lastAdbConnectMs: Long = 0L
 
     suspend fun hasRoot(): Boolean = withContext(Dispatchers.IO) {
         if (mode != ExecutionMode.ROOT) return@withContext false
@@ -59,18 +73,78 @@ class RootShell(
         return result
     }
 
+    /** Encerra a conexao ADB persistente (servico parado, troca de modo ou ociosa). */
+    fun releaseAdb() {
+        val client = adbClient
+        adbClient = null
+        adbClientPort = 0
+        lastAdbUseMs = 0L
+        if (client != null) runCatching { client.close() }
+    }
+
+    /**
+     * Fecha a sessao ADB quando ninguem pediu comando por [idleMs]. Sem isso o
+     * aviso "Depuracao por Wi-Fi conectada" ficaria preso na barra mesmo com o
+     * monitor desligado.
+     */
+    fun releaseAdbIfIdle(idleMs: Long = ADB_IDLE_RELEASE_MS) {
+        if (adbClient == null) return
+        val idle = SystemClock.elapsedRealtime() - lastAdbUseMs
+        if (idle < idleMs) return
+        if (!adbMutex.tryLock()) return
+        try {
+            if (SystemClock.elapsedRealtime() - lastAdbUseMs >= idleMs) releaseAdb()
+        } finally {
+            adbMutex.unlock()
+        }
+    }
+
     private fun execAdb(command: String): ShellResult {
         val port = adbPortProvider()
             ?: return ShellResult(-1, "", "Informe a porta de conexão ADB após o pareamento Wi-Fi")
-        return try {
-            require(port in 1..65535) { "Porta ADB inválida" }
-            Kadb.create("127.0.0.1", port, connectTimeout = ADB_TIMEOUT_MS, socketTimeout = ADB_TIMEOUT_MS).use { adb ->
-                val response = adb.shell(command)
-                ShellResult(response.exitCode, response.output, response.errorOutput)
-            }
-        } catch (t: Throwable) {
-            ShellResult(-1, "", t.message ?: "Falha ao executar comando ADB local")
+        if (port !in 1..65535) return ShellResult(-1, "", "Porta ADB inválida")
+
+        val first = runCatching { sendAdb(port, command) }
+        first.getOrNull()?.let { return it }
+
+        val error = first.exceptionOrNull()
+        if (error !is IOException && error !is IllegalStateException) {
+            return ShellResult(-1, "", error?.message ?: "Falha ao executar comando ADB local")
         }
+        // Falha que se repete a cada amostra nao pode virar reconexao a cada 2 s:
+        // seria o mesmo pisca-pisca da notificacao do sistema.
+        if (SystemClock.elapsedRealtime() - lastAdbConnectMs < MIN_RECONNECT_INTERVAL_MS) {
+            return ShellResult(-1, "", error?.message ?: "Falha ao executar comando ADB local")
+        }
+
+        // O transporte pode ter caido entre dois comandos (tela apagada, adbd reiniciado).
+        // Descarta o cliente e tenta uma unica vez com uma conexao nova.
+        releaseAdb()
+        return runCatching { sendAdb(port, command) }.getOrElse { failure ->
+            ShellResult(-1, "", failure.message ?: "Falha ao executar comando ADB local")
+        }
+    }
+
+    private fun sendAdb(port: Int, command: String): ShellResult {
+        val response = adbClientFor(port).shell(command)
+        lastAdbUseMs = SystemClock.elapsedRealtime()
+        return ShellResult(response.exitCode, response.output, response.errorOutput)
+    }
+
+    private fun adbClientFor(port: Int): Kadb {
+        val current = adbClient
+        if (current != null && adbClientPort == port) return current
+        if (current != null) runCatching { current.close() }
+        adbClient = null
+        adbClientPort = port
+        lastAdbUseMs = SystemClock.elapsedRealtime()
+        lastAdbConnectMs = lastAdbUseMs
+        return Kadb.create(
+            "127.0.0.1",
+            port,
+            connectTimeout = ADB_CONNECT_TIMEOUT_MS,
+            socketTimeout = ADB_IO_TIMEOUT_MS
+        ).also { adbClient = it }
     }
 
     private fun execRaw(command: String, asRoot: Boolean): ShellResult {
@@ -89,7 +163,14 @@ class RootShell(
     }
 
     companion object {
-        private const val ADB_TIMEOUT_MS = 5_000
+        private const val ADB_CONNECT_TIMEOUT_MS = 5_000
+        private const val ADB_IO_TIMEOUT_MS = 5_000
+
+        /** Tempo sem comandos ate liberar a sessao ADB (some o aviso persistente). */
+        const val ADB_IDLE_RELEASE_MS = 60_000L
+
+        /** Intervalo minimo entre reconexoes automaticas apos falha de transporte. */
+        private const val MIN_RECONNECT_INTERVAL_MS = 15_000L
     }
 }
 

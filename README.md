@@ -107,6 +107,11 @@ de seis dígitos e a porta de pareamento. Depois informe a porta de conexão
 cliente ADB TLS nativo em `127.0.0.1`; a identidade ADB fica em armazenamento
 privado excluído de backup. A sessão é uid `shell`, não root. O código do
 pareamento não é salvo após a tentativa. O modo sem root nunca chama `su`.
+A conexão criada com o pareamento é **reaproveitada** entre os comandos do
+monitor e só é refeita se a porta mudar, se o transporte cair ou após um minuto
+sem comandos. Isso é proposital: um cliente novo por comando fazia o Android
+anunciar "Depuração por Wi-Fi conectada" e retirá-la a cada poucos segundos,
+enchendo o histórico de notificações.
 
 O HUD requer permissão de sobreposição e o serviço de monitoramento. CPU, GPU e
 FPS são lidos **pelo shell** (root ou ADB Wi-Fi, que roda como uid `shell`): desde o
