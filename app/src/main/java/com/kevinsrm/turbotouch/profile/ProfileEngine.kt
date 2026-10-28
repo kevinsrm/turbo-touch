@@ -36,48 +36,52 @@ class ProfileEngine(
         apply(profile)
     }
 
-    suspend fun apply(profile: AppProfile) {
+    suspend fun apply(profile: AppProfile): List<ShellResult> {
+        val results = mutableListOf<ShellResult>()
         if (profile.refresh != RefreshTarget.AUTO) {
-            refresh.apply(profile.refresh)
+            results += refresh.apply(profile.refresh)
         }
         if (profile.gameMode != GameMode.DEFAULT) {
-            power.setGameMode(profile.packageName, profile.gameMode)
+            results += power.setGameMode(profile.packageName, profile.gameMode)
         }
         if (profile.lockMaxClocks) {
-            power.setFixedPerformance(true)
+            results += power.setFixedPerformance(true)
         }
         if (profile.aggressiveSaver) {
-            power.setForceIdle(profile.packageName, true)
-            power.setBackgroundRestricted(profile.packageName, true)
+            results += power.setForceIdle(profile.packageName, true)
+            results += power.setBackgroundRestricted(profile.packageName, true)
         }
         if (profile.gpuBoost) {
-            cpuGpu.setGpuMaxFreq(true)
+            results += cpuGpu.setGpuMaxFreq(true)
         }
         if (profile.schedulerBoost) {
-            cpuGpu.setSchedulerBoost(true)
+            results += cpuGpu.setSchedulerBoost(true)
         }
+        return results
     }
 
-    suspend fun revert(profile: AppProfile) {
+    suspend fun revert(profile: AppProfile): List<ShellResult> {
+        val results = mutableListOf<ShellResult>()
         if (profile.refresh != RefreshTarget.AUTO) {
-            refresh.restore()
+            results += refresh.restore()
         }
         if (profile.gameMode != GameMode.DEFAULT) {
-            power.setGameMode(profile.packageName, GameMode.STANDARD)
+            results += power.setGameMode(profile.packageName, GameMode.STANDARD)
         }
         if (profile.lockMaxClocks) {
-            power.setFixedPerformance(false)
+            results += power.setFixedPerformance(false)
         }
         if (profile.aggressiveSaver) {
-            power.setForceIdle(profile.packageName, false)
-            power.setBackgroundRestricted(profile.packageName, false)
+            results += power.setForceIdle(profile.packageName, false)
+            results += power.setBackgroundRestricted(profile.packageName, false)
         }
         if (profile.gpuBoost) {
-            cpuGpu.setGpuMaxFreq(false)
+            results += cpuGpu.setGpuMaxFreq(false)
         }
         if (profile.schedulerBoost) {
-            cpuGpu.setSchedulerBoost(false)
+            results += cpuGpu.setSchedulerBoost(false)
         }
+        return results
     }
 
     suspend fun revertEverything(): List<ShellResult> {
