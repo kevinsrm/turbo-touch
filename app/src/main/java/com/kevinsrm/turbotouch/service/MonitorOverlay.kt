@@ -8,6 +8,10 @@ import android.graphics.PixelFormat
 import android.hardware.display.DisplayManager
 import android.os.BatteryManager
 import android.provider.Settings
+import android.text.SpannableStringBuilder
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
+import android.text.style.RelativeSizeSpan
 import android.view.Display
 import android.view.Gravity
 import android.view.WindowManager
@@ -43,22 +47,42 @@ class MonitorOverlay(private val context: Context, private val prefs: Prefs) {
             val amperage = if (current != Int.MIN_VALUE) "%.0f mA".format(current / 1000f) else "indisponível"
             lines += "Bateria: $percent · $temperature\nCorrente: $amperage"
         }
-        if (view == null) {
-            val label = TextView(context).apply {
-                setTextColor(Color.WHITE)
-                setBackgroundColor(0xCC101418.toInt())
-                setPadding(16, 12, 16, 12)
-                textSize = 14f
-            }
-            val params = WindowManager.LayoutParams(
-                WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT,
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
-                PixelFormat.TRANSLUCENT
-            ).apply { gravity = Gravity.TOP or Gravity.END; y = 100 }
-            if (runCatching { window.addView(label, params) }.isSuccess) view = label
+        if (lines.isEmpty()) {
+            close()
+            return
         }
-        view?.text = lines.joinToString("\n")
+        ensureView()
+        view?.text = buildText(lines.joinToString("\n"), metrics.hint)
+    }
+
+    /** Corpo do HUD normal e a dica em corpo menor/cinza, sem quebrar a largura da tela. */
+    private fun buildText(body: String, hint: String): CharSequence {
+        if (hint.isBlank()) return body
+        val text = SpannableStringBuilder(body)
+        val start = text.length
+        text.append('\n').append(hint)
+        text.setSpan(RelativeSizeSpan(0.78f), start, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        text.setSpan(ForegroundColorSpan(0xFFA8B7C4.toInt()), start, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        return text
+    }
+
+    private fun ensureView() {
+        if (view != null) return
+        val screenWidth = context.resources.displayMetrics.widthPixels
+        val label = TextView(context).apply {
+            setTextColor(Color.WHITE)
+            setBackgroundColor(0xCC101418.toInt())
+            setPadding(16, 12, 16, 12)
+            textSize = 14f
+            maxWidth = (screenWidth * 0.72f).toInt()
+        }
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+            PixelFormat.TRANSLUCENT
+        ).apply { gravity = Gravity.TOP or Gravity.END; y = 100 }
+        if (runCatching { window.addView(label, params) }.isSuccess) view = label
     }
 
     fun close() {

@@ -2,6 +2,8 @@ package com.kevinsrm.turbotouch.core
 
 import com.flyfishxu.kadb.Kadb
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /**
@@ -22,6 +24,8 @@ class RootShell(
     @Volatile
     private var rootState: Boolean? = null
 
+    private val adbMutex = Mutex()
+
     suspend fun hasRoot(): Boolean = withContext(Dispatchers.IO) {
         if (mode != ExecutionMode.ROOT) return@withContext false
         rootState ?: run {
@@ -40,7 +44,9 @@ class RootShell(
         val activeMode = mode
         val result = when (activeMode) {
             ExecutionMode.ROOT -> withContext(Dispatchers.IO) { execRaw(command, asRoot = true) }
-            ExecutionMode.ADB_WIFI -> withContext(Dispatchers.IO) { execAdb(command) }
+            // O monitor e o loop de perfis executam em paralelo: serializamos o ADB
+            // para nao abrir duas conexoes TLS (handshake + auth) ao mesmo tempo.
+            ExecutionMode.ADB_WIFI -> withContext(Dispatchers.IO) { adbMutex.withLock { execAdb(command) } }
             ExecutionMode.STANDARD -> ShellResult(-1, "", "Comando privilegiado indisponivel no modo sem root")
         }
         if (record) CommandLog.record(command, result)
