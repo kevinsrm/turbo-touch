@@ -56,7 +56,9 @@ class TurboService : Service() {
         scope.launch {
             val metrics = MonitorMetrics(graph.shell, graph.prefs)
             while (isActive) {
-                val snapshot = runCatching { metrics.sample() }.getOrDefault(MonitorMetrics.Snapshot("n/d", "n/d", "n/d"))
+                val snapshot = runCatching { metrics.sample() }.getOrElse { error ->
+                    MonitorMetrics.Snapshot(hint = "falha ao ler métricas: ${error.message ?: error::class.java.simpleName}")
+                }
                 withContext(Dispatchers.Main) { overlay.update(snapshot) }
                 delay(2000L)
             }

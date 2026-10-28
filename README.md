@@ -108,9 +108,12 @@ cliente ADB TLS nativo em `127.0.0.1`; a identidade ADB fica em armazenamento
 privado excluído de backup. A sessão é uid `shell`, não root. O código do
 pareamento não é salvo após a tentativa. O modo sem root nunca chama `su`.
 
-O HUD requer permissão de sobreposição e o serviço de monitoramento. CPU é
-estimada por diferenças de `/proc/stat`; GPU consulta interfaces sysfs comuns de
-fabricantes; ambas podem aparecer como `n/d` se o sistema não as expõe. FPS usa
-`dumpsys SurfaceFlinger --latency` quando há acesso via root ou ADB Wi-Fi e pode
-não estar disponível em todas as versões/fabricantes. Hz e nível, temperatura e
-corrente da bateria também são exibidos quando reportados pelo dispositivo.
+O HUD requer permissão de sobreposição e o serviço de monitoramento. CPU, GPU e
+FPS são lidos **pelo shell** (root ou ADB Wi-Fi, que roda como uid `shell`): desde o
+Android 8 o próprio app não lê `/proc/stat` nem os nós sysfs da GPU, então a
+leitura direta aparecia sempre como `n/d`. Uma única chamada por amostra coleta
+`/proc/stat`, os nós de GPU do fabricante e o `dumpsys SurfaceFlinger --latency`
+da camada do app em primeiro plano (com `dumpsys gfxinfo` como reserva). Tudo
+continua best-effort: a GPU não é exposta em todos os aparelhos e o FPS fica `n/d`
+quando o SurfaceFlinger não lista a camada do app. Sem root/ADB o HUD mostra Hz e
+bateria e escreve na última linha o motivo da indisponibilidade.

@@ -89,10 +89,10 @@ fun SettingsScreen(state: TurboUiState, viewModel: TurboViewModel) {
         }
         SectionCard("Monitor flutuante") {
             Text("Requer permissão de sobreposição e monitor ativo.", style = MaterialTheme.typography.bodySmall)
-            SwitchRow("FPS", subtitle = "Medição best-effort via SurfaceFlinger (requer Root ou ADB Wi-Fi)", checked = state.hudFps, onCheckedChange = viewModel::setHudFps)
+            SwitchRow("FPS", subtitle = "Camada do app via SurfaceFlinger (requer Root ou ADB Wi-Fi)", checked = state.hudFps, onCheckedChange = viewModel::setHudFps)
             SwitchRow("Taxa da tela", checked = state.hudRefresh, onCheckedChange = viewModel::setHudRefresh)
             SwitchRow("Bateria", subtitle = "Nível, temperatura e corrente reportados pelo aparelho", checked = state.hudBattery, onCheckedChange = viewModel::setHudBattery)
-            SwitchRow("CPU e GPU", subtitle = "CPU via /proc/stat; GPU via interfaces do fabricante, quando expostas", checked = state.hudCpuGpu, onCheckedChange = viewModel::setHudCpuGpu)
+            SwitchRow("CPU e GPU", subtitle = "Lidos via shell: /proc/stat e nós sysfs da GPU (requer Root ou ADB Wi-Fi)", checked = state.hudCpuGpu, onCheckedChange = viewModel::setHudCpuGpu)
             OutlinedButton(onClick = { openIntent(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}"))) }) { Text("Permitir sobreposição") }
         }
 
